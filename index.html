@@ -1,0 +1,1106 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scanner & Pemeriksa Lembar Jawaban Ujian</title>
+    <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+        }
+        
+        .section {
+            margin-bottom: 30px;
+            padding: 25px;
+            border-radius: 15px;
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            transition: all 0.3s;
+        }
+        
+        .section:hover {
+            border-color: #667eea;
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.1);
+        }
+        
+        .section-title {
+            font-size: 1.4em;
+            color: #444;
+            margin-bottom: 20px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .input-group {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .input-group label {
+            min-width: 150px;
+            font-weight: 600;
+            color: #555;
+        }
+        
+        input[type="text"], input[type="number"], select {
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+        
+        input[type="text"]:focus, input[type="number"]:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        button {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 10px;
+            background: #667eea;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        button:hover {
+            background: #764ba2;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .btn-success { background: #28a745; }
+        .btn-success:hover { background: #218838; }
+        
+        .btn-danger { background: #dc3545; }
+        .btn-danger:hover { background: #c82333; }
+        
+        .btn-warning { background: #ffc107; color: #333; }
+        .btn-warning:hover { background: #e0a800; }
+        
+        .upload-area {
+            border: 3px dashed #667eea;
+            border-radius: 15px;
+            padding: 50px 30px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: #f8f9ff;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .upload-area:hover {
+            background: #f0f0ff;
+            border-color: #764ba2;
+            transform: scale(1.02);
+        }
+        
+        .upload-area.dragover {
+            background: #e8e8ff;
+            border-color: #764ba2;
+            transform: scale(1.05);
+        }
+        
+        .upload-icon {
+            font-size: 4em;
+            margin-bottom: 15px;
+            color: #667eea;
+        }
+        
+        .file-input { display: none; }
+        
+        .preview-container {
+            margin-top: 20px;
+            text-align: center;
+            position: relative;
+        }
+        
+        .preview-image {
+            max-width: 100%;
+            max-height: 500px;
+            border-radius: 10px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+            border: 3px solid #ddd;
+        }
+        
+        .answers-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+            gap: 12px;
+            margin-top: 20px;
+        }
+        
+        .answer-item {
+            padding: 15px;
+            border-radius: 12px;
+            text-align: center;
+            font-weight: bold;
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .answer-item::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+        }
+        
+        .answer-item.correct {
+            background: #d4edda;
+            color: #155724;
+            border: 2px solid #28a745;
+        }
+        
+        .answer-item.correct::before { background: #28a745; }
+        
+        .answer-item.wrong {
+            background: #f8d7da;
+            color: #721c24;
+            border: 2px solid #dc3545;
+        }
+        
+        .answer-item.wrong::before { background: #dc3545; }
+        
+        .answer-item.empty {
+            background: #fff3cd;
+            color: #856404;
+            border: 2px solid #ffc107;
+        }
+        
+        .answer-item.empty::before { background: #ffc107; }
+        
+        .answer-number {
+            font-size: 0.85em;
+            opacity: 0.8;
+            margin-bottom: 5px;
+        }
+        
+        .answer-value {
+            font-size: 1.6em;
+            margin: 5px 0;
+        }
+        
+        .answer-key {
+            font-size: 0.8em;
+            opacity: 0.9;
+            margin-top: 5px;
+        }
+        
+        .result-box {
+            text-align: center;
+            padding: 40px;
+            border-radius: 20px;
+            margin-top: 25px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+        }
+        
+        .score-display {
+            font-size: 4em;
+            font-weight: bold;
+            margin: 20px 0;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        .stats {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 25px;
+            flex-wrap: wrap;
+        }
+        
+        .stat-item {
+            text-align: center;
+            padding: 20px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 15px;
+            min-width: 140px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+        
+        .stat-value {
+            font-size: 2.5em;
+            font-weight: bold;
+        }
+        
+        .stat-label {
+            font-size: 0.9em;
+            opacity: 0.9;
+            margin-top: 5px;
+        }
+        
+        .hidden { display: none !important; }
+        
+        .progress-container {
+            margin: 20px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            text-align: center;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 30px;
+            background: #e9ecef;
+            border-radius: 15px;
+            overflow: hidden;
+            margin: 15px 0;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            width: 0%;
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+        
+        .ocr-result {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .ocr-text {
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+            max-height: 300px;
+            overflow-y: auto;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .comparison-table th,
+        .comparison-table td {
+            padding: 15px;
+            text-align: center;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .comparison-table th {
+            background: #667eea;
+            color: white;
+            font-weight: 600;
+        }
+        
+        .comparison-table tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .status-badge {
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: bold;
+            display: inline-block;
+        }
+        
+        .badge-success { background: #d4edda; color: #155724; }
+        .badge-danger { background: #f8d7da; color: #721c24; }
+        .badge-warning { background: #fff3cd; color: #856404; }
+        
+        .manual-input-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .manual-input-item {
+            text-align: center;
+        }
+        
+        .manual-input-item label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #555;
+            font-size: 0.9em;
+        }
+        
+        .manual-input-item input {
+            width: 100%;
+            text-align: center;
+            text-transform: uppercase;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+        
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+        }
+        
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.3s;
+            font-weight: 600;
+            color: #666;
+        }
+        
+        .tab:hover { background: #f0f0f0; }
+        .tab.active {
+            background: #667eea;
+            color: white;
+        }
+        
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        
+        .alert {
+            padding: 15px 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .alert-info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .extracted-answers {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 15px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+        
+        .extracted-answer {
+            padding: 8px 15px;
+            background: white;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        @media (max-width: 768px) {
+            .container { padding: 15px; }
+            h1 { font-size: 1.8em; }
+            .answers-grid { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); }
+            .stats { flex-direction: column; align-items: center; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📋 Scanner Lembar Jawaban Ujian</h1>
+        <p class="subtitle">Upload gambar lembar jawaban untuk pemeriksaan otomatis</p>
+        
+        <!-- Section 1: Setting Kunci Jawaban -->
+        <div class="section">
+            <div class="section-title">🔑 Setting Kunci Jawaban</div>
+            
+            <div class="input-group">
+                <label>Jumlah Soal:</label>
+                <input type="number" id="totalQuestions" value="20" min="1" max="100" style="width: 100px;">
+                <button onclick="generateAnswerInputs()">Generate Form</button>
+            </div>
+            
+            <div id="answerKeyContainer" style="margin-top: 15px;">
+                <div class="alert alert-info">
+                    <span>ℹ️</span>
+                    <span>Klik "Generate Form" untuk membuat form kunci jawaban. Format: A, B, C, D, atau E.</span>
+                </div>
+            </div>
+            
+            <button class="btn-success hidden" id="saveKeyBtn" onclick="saveAnswerKey()">
+                💾 Simpan Kunci Jawaban
+            </button>
+        </div>
+
+        <!-- Section 2: Input Jawaban Siswa (Tabs) -->
+        <div class="section hidden" id="studentSection">
+            <div class="section-title">📝 Input Jawaban Siswa</div>
+            
+            <div class="tabs">
+                <div class="tab active" onclick="switchTab('upload')">📤 Upload Gambar (OCR)</div>
+                <div class="tab" onclick="switchTab('manual')">⌨️ Input Manual</div>
+            </div>
+            
+            <!-- Tab Upload -->
+            <div id="uploadTab" class="tab-content active">
+                <div class="input-group">
+                    <label>Nama Siswa:</label>
+                    <input type="text" id="studentNameUpload" placeholder="Masukkan nama siswa" style="width: 300px;">
+                </div>
+                
+                <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
+                    <div class="upload-icon">📷</div>
+                    <h3>Klik atau Drop Gambar Disini</h3>
+                    <p style="color: #666; margin-top: 10px;">Format: JPG, PNG, GIF, BMP, WEBP</p>
+                    <p style="color: #999; font-size: 0.9em; margin-top: 5px;">
+                        Pastikan gambar jelas dan jawaban terbaca
+                    </p>
+                    <input type="file" id="fileInput" class="file-input" accept="image/*" onchange="handleFileSelect(event)">
+                </div>
+                
+                <div class="preview-container hidden" id="previewContainer">
+                    <h4 style="margin-bottom: 15px;">Preview Gambar:</h4>
+                    <img id="previewImage" class="preview-image" alt="Preview">
+                    
+                    <div style="margin-top: 20px;">
+                        <button onclick="processImage()" id="processBtn">
+                            🔍 Proses Gambar (OCR)
+                        </button>
+                        <button class="btn-danger" onclick="clearImage()">🗑️ Hapus Gambar</button>
+                    </div>
+                </div>
+                
+                <div class="progress-container hidden" id="progressContainer">
+                    <h4>Memproses Gambar...</h4>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill">0%</div>
+                    </div>
+                    <p id="progressText" style="margin-top: 10px; color: #666;">Menginisialisasi OCR...</p>
+                </div>
+                
+                <div class="ocr-result hidden" id="ocrResult">
+                    <h4>Hasil OCR (Teks Terdeteksi):</h4>
+                    <div class="ocr-text" id="ocrText"></div>
+                    
+                    <div style="margin-top: 15px;">
+                        <h4>Jawaban Terdeteksi:</h4>
+                        <div class="extracted-answers" id="extractedAnswers"></div>
+                    </div>
+                    
+                    <div style="margin-top: 20px;">
+                        <button class="btn-success" onclick="useExtractedAnswers()">
+                            ✅ Gunakan Jawaban Terdeteksi
+                        </button>
+                        <button class="btn-warning" onclick="editExtractedAnswers()">
+                            ✏️ Edit Jawaban
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Tab Manual -->
+            <div id="manualTab" class="tab-content">
+                <div class="input-group">
+                    <label>Nama Siswa:</label>
+                    <input type="text" id="studentNameManual" placeholder="Masukkan nama siswa" style="width: 300px;">
+                </div>
+                
+                <div id="manualInputsContainer"></div>
+                
+                <button class="btn-success" onclick="checkManualAnswers()" style="margin-top: 20px;">
+                    🔍 Periksa Jawaban
+                </button>
+            </div>
+        </div>
+
+        <!-- Section 3: Hasil Pemeriksaan -->
+        <div class="section hidden" id="resultSection">
+            <div class="section-title">📊 Hasil Pemeriksaan</div>
+            
+            <div class="result-box">
+                <div style="font-size: 1.3em; margin-bottom: 10px;">
+                    Nama Siswa: <strong id="resultName">-</strong>
+                </div>
+                <div class="score-display" id="scoreDisplay">0</div>
+                <div style="font-size: 1.2em;">Nilai Akhir (Skala 100)</div>
+                
+                <div class="stats">
+                    <div class="stat-item">
+                        <div class="stat-value" id="correctCount">0</div>
+                        <div class="stat-label">Benar ✅</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="wrongCount">0</div>
+                        <div class="stat-label">Salah ❌</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="emptyCount">0</div>
+                        <div class="stat-label">Kosong ⚠️</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="margin-top: 30px;">
+                <div class="section-title">Detail Perbandingan</div>
+                <div class="answers-grid" id="detailGrid"></div>
+            </div>
+            
+            <div style="margin-top: 30px;">
+                <div class="section-title">Tabel Detail</div>
+                <div style="overflow-x: auto;">
+                    <table class="comparison-table">
+                        <thead>
+                            <tr>
+                                <th>No</th>
+                                <th>Kunci Jawaban</th>
+                                <th>Jawaban Siswa</th>
+                                <th>Status</th>
+                                <th>Keterangan</th>
+                            </tr>
+                        </thead>
+                        <tbody id="comparisonTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <div style="margin-top: 30px; text-align: center;">
+                <button onclick="resetForNewStudent()">🔄 Periksa Siswa Lain</button>
+                <button class="btn-success" onclick="exportResults()">📥 Export Hasil (CSV)</button>
+                <button class="btn-warning" onclick="window.print()">🖨️ Print Hasil</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let answerKey = [];
+        let studentAnswers = [];
+        let extractedAnswersFromOCR = [];
+        let currentResult = null;
+        let totalQuestions = 0;
+
+        // Initialize Tesseract worker
+        let worker = null;
+        
+        async function initializeWorker() {
+            if (!worker) {
+                worker = await Tesseract.createWorker('eng');
+            }
+        }
+
+        // Tab switching
+        function switchTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            
+            if (tab === 'upload') {
+                document.querySelectorAll('.tab')[0].classList.add('active');
+                document.getElementById('uploadTab').classList.add('active');
+            } else {
+                document.querySelectorAll('.tab')[1].classList.add('active');
+                document.getElementById('manualTab').classList.add('active');
+            }
+        }
+
+        // Generate answer key inputs
+        function generateAnswerInputs() {
+            totalQuestions = parseInt(document.getElementById('totalQuestions').value) || 20;
+            const container = document.getElementById('answerKeyContainer');
+            
+            let html = '<div class="manual-input-grid">';
+            for (let i = 1; i <= totalQuestions; i++) {
+                html += `
+                    <div class="manual-input-item">
+                        <label>No. ${i}</label>
+                        <input type="text" 
+                               id="key_${i}" 
+                               maxlength="1" 
+                               placeholder="A-E"
+                               oninput="validateAnswerInput(this)">
+                    </div>
+                `;
+            }
+            html += '</div>';
+            
+            container.innerHTML = html;
+            document.getElementById('saveKeyBtn').classList.remove('hidden');
+        }
+
+        function validateAnswerInput(input) {
+            const valid = ['A', 'B', 'C', 'D', 'E', 'a', 'b', 'c', 'd', 'e'];
+            const val = input.value;
+            if (!valid.includes(val) && val !== '') {
+                input.value = '';
+                showAlert('Hanya boleh A, B, C, D, atau E', 'warning');
+            } else {
+                input.value = val.toUpperCase();
+            }
+        }
+
+        function showAlert(message, type = 'info') {
+            // Simple alert implementation - bisa diganti dengan toast notification
+            alert(message);
+        }
+
+        // Save answer key
+        function saveAnswerKey() {
+            answerKey = [];
+            let emptyCount = 0;
+            
+            for (let i = 1; i <= totalQuestions; i++) {
+                const val = document.getElementById(`key_${i}`).value.toUpperCase();
+                if (!val) emptyCount++;
+                answerKey.push(val || '-');
+            }
+            
+            if (emptyCount > 0) {
+                if (!confirm(`Ada ${emptyCount} jawaban yang kosong. Lanjutkan?`)) return;
+            }
+            
+            // Generate manual inputs for student
+            const manualContainer = document.getElementById('manualInputsContainer');
+            let html = '<div class="manual-input-grid">';
+            for (let i = 1; i <= totalQuestions; i++) {
+                html += `
+                    <div class="manual-input-item">
+                        <label>No. ${i}</label>
+                        <input type="text" 
+                               id="manual_${i}" 
+                               maxlength="1" 
+                               placeholder="A-E"
+                               oninput="validateAnswerInput(this)">
+                    </div>
+                `;
+            }
+            html += '</div>';
+            manualContainer.innerHTML = html;
+            
+            document.getElementById('studentSection').classList.remove('hidden');
+            document.getElementById('studentSection').scrollIntoView({ behavior: 'smooth' });
+            
+            // Initialize OCR worker in background
+            initializeWorker().then(() => {
+                console.log('OCR Worker ready');
+            });
+        }
+
+        // File handling
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            if (!file.type.startsWith('image/')) {
+                alert('Mohon upload file gambar (JPG, PNG, GIF, BMP, WEBP)');
+                return;
+            }
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = document.getElementById('previewImage');
+                img.src = e.target.result;
+                document.getElementById('previewContainer').classList.remove('hidden');
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // Drag and drop
+        const uploadArea = document.getElementById('uploadArea');
+        
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                document.getElementById('fileInput').files = files;
+                handleFileSelect({ target: { files: files } });
+            }
+        });
+
+        function clearImage() {
+            document.getElementById('fileInput').value = '';
+            document.getElementById('previewContainer').classList.add('hidden');
+            document.getElementById('ocrResult').classList.add('hidden');
+            document.getElementById('progressContainer').classList.add('hidden');
+        }
+
+        // Process image with OCR
+        async function processImage() {
+            const img = document.getElementById('previewImage');
+            if (!img.src) {
+                alert('Silakan upload gambar terlebih dahulu');
+                return;
+            }
+            
+            const progressContainer = document.getElementById('progressContainer');
+            const progressFill = document.getElementById('progressFill');
+            const progressText = document.getElementById('progressText');
+            const processBtn = document.getElementById('processBtn');
+            
+            progressContainer.classList.remove('hidden');
+            processBtn.disabled = true;
+            
+            try {
+                await initializeWorker();
+                
+                const result = await worker.recognize(img.src, {}, {
+                    logger: m => {
+                        if (m.status === 'recognizing text') {
+                            const progress = Math.round(m.progress * 100);
+                            progressFill.style.width = progress + '%';
+                            progressFill.textContent = progress + '%';
+                            progressText.textContent = `Mengenali teks... ${progress}%`;
+                        } else {
+                            progressText.textContent = m.status;
+                        }
+                    }
+                });
+                
+                const text = result.data.text;
+                document.getElementById('ocrText').textContent = text;
+                
+                // Extract answers from OCR text
+                extractedAnswersFromOCR = extractAnswersFromText(text);
+                displayExtractedAnswers();
+                
+                document.getElementById('ocrResult').classList.remove('hidden');
+                progressContainer.classList.add('hidden');
+                
+            } catch (error) {
+                console.error('OCR Error:', error);
+                alert('Terjadi kesalahan saat memproses gambar: ' + error.message);
+                progressContainer.classList.add('hidden');
+            } finally {
+                processBtn.disabled = false;
+            }
+        }
+
+        // Extract answers from OCR text using regex patterns
+        function extractAnswersFromText(text) {
+            const answers = [];
+            const lines = text.split('\n');
+            
+            // Pattern 1: "1. A" or "1.A" or "1 - A"
+            const pattern1 = /(\d+)[\.\)\-]?\s*([A-Ea-e])/g;
+            
+            // Pattern 2: "No 1: A" or "Nomor 1: A"
+            const pattern2 = /(?:no|nomor)\s*(\d+)[:.]?\s*([A-Ea-e])/gi;
+            
+            // Pattern 3: "1 A" (number followed by letter)
+            const pattern3 = /(?:^|\s)(\d+)\s+([A-Ea-e])(?:\s|$)/g;
+            
+            let match;
+            const foundAnswers = new Map();
+            
+            // Try pattern 1
+            while ((match = pattern1.exec(text)) !== null) {
+                const num = parseInt(match[1]);
+                const ans = match[2].toUpperCase();
+                if (num <= totalQuestions) {
+                    foundAnswers.set(num, ans);
+                }
+            }
+            
+            // Try pattern 2
+            while ((match = pattern2.exec(text)) !== null) {
+                const num = parseInt(match[1]);
+                const ans = match[2].toUpperCase();
+                if (num <= totalQuestions) {
+                    foundAnswers.set(num, ans);
+                }
+            }
+            
+            // Try pattern 3
+            while ((match = pattern3.exec(text)) !== null) {
+                const num = parseInt(match[1]);
+                const ans = match[2].toUpperCase();
+                if (num <= totalQuestions && !foundAnswers.has(num)) {
+                    foundAnswers.set(num, ans);
+                }
+            }
+            
+            // Convert to array
+            for (let i = 1; i <= totalQuestions; i++) {
+                answers.push(foundAnswers.get(i) || '-');
+            }
+            
+            return answers;
+        }
+
+        function displayExtractedAnswers() {
+            const container = document.getElementById('extractedAnswers');
+            let html = '';
+            
+            extractedAnswersFromOCR.forEach((ans, idx) => {
+                if (ans !== '-') {
+                    html += `<span class="extracted-answer">No. ${idx + 1}: ${ans}</span>`;
+                }
+            });
+            
+            if (html === '') {
+                html = '<span style="color: #999;">Tidak ada jawaban terdeteksi. Silakan input manual.</span>';
+            }
+            
+            container.innerHTML = html;
+        }
+
+        function useExtractedAnswers() {
+            studentAnswers = [...extractedAnswersFromOCR];
+            const studentName = document.getElementById('studentNameUpload').value || 'Siswa';
+            checkAndShowResults(studentName);
+        }
+
+        function editExtractedAnswers() {
+            // Switch to manual tab and fill with extracted answers
+            switchTab('manual');
+            document.getElementById('studentNameManual').value = document.getElementById('studentNameUpload').value;
+            
+            extractedAnswersFromOCR.forEach((ans, idx) => {
+                const input = document.getElementById(`manual_${idx + 1}`);
+                if (input && ans !== '-') {
+                    input.value = ans;
+                }
+            });
+        }
+
+        // Check manual answers
+        function checkManualAnswers() {
+            studentAnswers = [];
+            const studentName = document.getElementById('studentNameManual').value || 'Siswa';
+            
+            for (let i = 1; i <= totalQuestions; i++) {
+                const val = document.getElementById(`manual_${i}`).value.toUpperCase();
+                studentAnswers.push(val || '-');
+            }
+            
+            checkAndShowResults(studentName);
+        }
+
+        // Core checking logic
+        function checkAndShowResults(studentName) {
+            let correct = 0;
+            let wrong = 0;
+            let empty = 0;
+            const details = [];
+            
+            for (let i = 0; i < totalQuestions; i++) {
+                const key = answerKey[i];
+                const answer = studentAnswers[i];
+                
+                if (answer === '-') {
+                    empty++;
+                    details.push({ no: i + 1, key, answer, status: 'empty' });
+                } else if (answer === key) {
+                    correct++;
+                    details.push({ no: i + 1, key, answer, status: 'correct' });
+                } else {
+                    wrong++;
+                    details.push({ no: i + 1, key, answer, status: 'wrong' });
+                }
+            }
+            
+            const score = totalQuestions > 0 ? (correct / totalQuestions) * 100 : 0;
+            
+            currentResult = {
+                name: studentName,
+                correct,
+                wrong,
+                empty,
+                score: score.toFixed(2),
+                details
+            };
+            
+            // Display results
+            document.getElementById('resultName').textContent = studentName;
+            document.getElementById('scoreDisplay').textContent = score.toFixed(2);
+            document.getElementById('correctCount').textContent = correct;
+            document.getElementById('wrongCount').textContent = wrong;
+            document.getElementById('emptyCount').textContent = empty;
+            
+            // Detail grid
+            const grid = document.getElementById('detailGrid');
+            grid.innerHTML = details.map(d => `
+                <div class="answer-item ${d.status}">
+                    <div class="answer-number">No. ${d.no}</div>
+                    <div class="answer-value">${d.answer !== '-' ? d.answer : '?'}</div>
+                    <div class="answer-key">Kunci: ${d.key}</div>
+                    <div style="margin-top: 8px; font-size: 1.3em;">
+                        ${d.status === 'correct' ? '✅' : d.status === 'wrong' ? '❌' : '⚠️'}
+                    </div>
+                </div>
+            `).join('');
+            
+            // Comparison table
+            const tableBody = document.getElementById('comparisonTableBody');
+            tableBody.innerHTML = details.map(d => {
+                const statusClass = d.status === 'correct' ? 'badge-success' : 
+                                   d.status === 'wrong' ? 'badge-danger' : 'badge-warning';
+                const statusText = d.status === 'correct' ? 'Benar' : 
+                                  d.status === 'wrong' ? 'Salah' : 'Kosong';
+                const keterangan = d.status === 'correct' ? 'Jawaban sesuai kunci' :
+                                  d.status === 'wrong' ? `Jawaban seharusnya ${d.key}` :
+                                  'Tidak dijawab';
+                
+                return `
+                    <tr>
+                        <td><strong>${d.no}</strong></td>
+                        <td><strong>${d.key}</strong></td>
+                        <td>${d.answer !== '-' ? d.answer : '<em style="color: #999;">-</em>'}</td>
+                        <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+                        <td>${keterangan}</td>
+                    </tr>
+                `;
+            }).join('');
+            
+            document.getElementById('resultSection').classList.remove('hidden');
+            document.getElementById('resultSection').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function resetForNewStudent() {
+            // Clear student inputs
+            document.getElementById('studentNameUpload').value = '';
+            document.getElementById('studentNameManual').value = '';
+            clearImage();
+            
+            // Clear manual inputs
+            for (let i = 1; i <= totalQuestions; i++) {
+                const input = document.getElementById(`manual_${i}`);
+                if (input) input.value = '';
+            }
+            
+            document.getElementById('resultSection').classList.add('hidden');
+            document.getElementById('studentSection').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function exportResults() {
+            if (!currentResult) return;
+            
+            let csv = 'No,Kunci Jawaban,Jawaban Siswa,Status,Keterangan\n';
+            currentResult.details.forEach(d => {
+                const status = d.status === 'correct' ? 'Benar' : d.status === 'wrong' ? 'Salah' : 'Kosong';
+                const keterangan = d.status === 'correct' ? 'Jawaban sesuai kunci' :
+                                  d.status === 'wrong' ? `Jawaban seharusnya ${d.key}` :
+                                  'Tidak dijawab';
+                csv += `${d.no},${d.key},${d.answer},${status},${keterangan}\n`;
+            });
+            
+            csv += `\nNama Siswa,${currentResult.name}\n`;
+            csv += `Benar,${currentResult.correct}\n`;
+            csv += `Salah,${currentResult.wrong}\n`;
+            csv += `Kosong,${currentResult.empty}\n`;
+            csv += `Nilai,${currentResult.score}\n`;
+            
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `hasil_ujian_${currentResult.name.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.csv`;
+            link.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // Cleanup worker on page unload
+        window.addEventListener('beforeunload', async () => {
+            if (worker) {
+                await worker.terminate();
+            }
+        });
+    </script>
+</body>
+</html>
