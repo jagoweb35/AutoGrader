@@ -2,220 +2,382 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
-    <meta name="theme-color" content="#667eea">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+    <meta name="theme-color" content="#4f46e5">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="format-detection" content="telephone=no">
     <meta name="mobile-web-app-capable" content="yes">
-    <meta name="description" content="AutoGrader - Aplikasi pemeriksa lembar jawaban ujian otomatis dengan OCR">
     
-    <title>AutoGrader - Pemeriksa Lembar Jawaban Ujian</title>
+    <title>AutoGrader - Pemeriksa Lembar Jawaban Otomatis</title>
     
-    <!-- Preconnect for performance -->
     <link rel="preconnect" href="https://cdn.jsdelivr.net">
-    
-    <!-- External CSS -->
     <link rel="stylesheet" href="css/style.css">
-    
-    <!-- Tesseract.js CDN -->
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     
-    <!-- PWA Manifest (Optional) -->
     <link rel="manifest" href="manifest.json">
-    
-    <!-- Icons -->
-    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📋</text></svg>">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📝</text></svg>">
 </head>
 <body>
-    <div class="container">
+    <div class="app-container">
         <!-- Header -->
         <header class="app-header">
-            <h1>📋 AutoGrader</h1>
-            <p class="subtitle">Scanner & Pemeriksa Lembar Jawaban Ujian Otomatis</p>
+            <div class="logo">
+                <span class="logo-icon">📝</span>
+                <div class="logo-text">
+                    <h1>AutoGrader</h1>
+                    <span class="logo-tagline">Pemeriksa Jawaban Otomatis</span>
+                </div>
+            </div>
+            <nav class="main-nav">
+                <button class="nav-btn active" onclick="app.showPage('grading')" data-page="grading">
+                    <span>✓</span> Periksa
+                </button>
+                <button class="nav-btn" onclick="app.showPage('history')" data-page="history">
+                    <span>📚</span> Riwayat
+                </button>
+            </nav>
         </header>
 
-        <!-- Section 1: Setting Kunci Jawaban -->
-        <section class="section" id="answerKeySection">
-            <div class="section-title">🔑 Setting Kunci Jawaban</div>
+        <!-- PAGE: GRADING -->
+        <main class="page active" id="page-grading">
             
-            <div class="input-group">
-                <label for="totalQuestions">Jumlah Soal:</label>
-                <input type="number" id="totalQuestions" value="20" min="1" max="100" inputmode="numeric">
-                <button type="button" onclick="app.generateAnswerInputs()">Generate Form</button>
-            </div>
-            
-            <div id="answerKeyContainer">
-                <div class="alert alert-info">
-                    <span>ℹ️</span>
-                    <span>Klik "Generate Form" untuk membuat form kunci jawaban. Format: A, B, C, D, atau E.</span>
+            <!-- Section 1: Setting Kunci Jawaban -->
+            <section class="section" id="answerKeySection">
+                <div class="section-header">
+                    <div class="section-title">🔑 Setting Kunci Jawaban</div>
+                    <div class="section-badge" id="keyStatus">Belum diatur</div>
                 </div>
-            </div>
-            
-            <button type="button" class="btn-success hidden" id="saveKeyBtn" onclick="app.saveAnswerKey()">
-                💾 Simpan Kunci Jawaban
-            </button>
-        </section>
+                
+                <div class="config-row">
+                    <div class="input-group">
+                        <label for="totalQuestions">Jumlah Soal:</label>
+                        <input type="number" id="totalQuestions" value="20" min="1" max="200" inputmode="numeric">
+                    </div>
+                    <div class="input-group">
+                        <label for="examType">Jenis Ujian:</label>
+                        <select id="examType">
+                            <option value="UTS">UTS (Ujian Tengah Semester)</option>
+                            <option value="UAS">UAS (Ujian Akhir Semester)</option>
+                            <option value="UH">UH (Ulangan Harian)</option>
+                            <option value="PTS">PTS (Penilaian Tengah Semester)</option>
+                            <option value="PAS">PAS (Penilaian Akhir Semester)</option>
+                            <option value="Lainnya">Lainnya</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label for="subject">Mata Pelajaran:</label>
+                        <input type="text" id="subject" placeholder="Contoh: Matematika">
+                    </div>
+                    <button type="button" class="btn-primary" onclick="app.generateAnswerInputs()">
+                        Generate Form
+                    </button>
+                </div>
+                
+                <div id="answerKeyContainer" class="answer-key-container">
+                    <div class="empty-state">
+                        <div class="empty-icon">📋</div>
+                        <p>Atur jumlah soal dan klik "Generate Form" untuk membuat kunci jawaban</p>
+                    </div>
+                </div>
+                
+                <div class="section-actions hidden" id="keyActions">
+                    <button type="button" class="btn-success" onclick="app.saveAnswerKey()">
+                        💾 Simpan Kunci Jawaban
+                    </button>
+                    <button type="button" class="btn-secondary" onclick="app.clearAnswerKey()">
+                        🗑️ Reset
+                    </button>
+                </div>
+            </section>
 
-        <!-- Section 2: Input Jawaban Siswa -->
-        <section class="section hidden" id="studentSection">
-            <div class="section-title">📝 Input Jawaban Siswa</div>
-            
-            <!-- Tabs -->
-            <div class="tabs">
-                <button type="button" class="tab active" onclick="app.switchTab('upload')">
-                    <span>📤</span> Upload Gambar (OCR)
-                </button>
-                <button type="button" class="tab" onclick="app.switchTab('manual')">
-                    <span>⌨️</span> Input Manual
-                </button>
-            </div>
-            
-            <!-- Tab Upload -->
-            <div id="uploadTab" class="tab-content active">
-                <div class="input-group">
-                    <label for="studentNameUpload">Nama Siswa:</label>
-                    <input type="text" id="studentNameUpload" placeholder="Masukkan nama siswa" autocomplete="name">
+            <!-- Section 2: Input Jawaban Siswa -->
+            <section class="section hidden" id="studentSection">
+                <div class="section-header">
+                    <div class="section-title">📝 Input Jawaban Siswa</div>
+                    <div class="exam-info" id="examInfoDisplay"></div>
                 </div>
                 
-                <div class="upload-area" id="uploadArea" role="button" tabindex="0" aria-label="Upload gambar lembar jawaban">
-                    <div class="upload-icon">📷</div>
-                    <h3>Klik atau Drop Gambar Disini</h3>
-                    <p class="upload-hint">Format: JPG, PNG, GIF, BMP, WEBP</p>
-                    <p class="upload-subhint">Pastikan gambar jelas dan jawaban terbaca</p>
-                    <input type="file" id="fileInput" class="file-input" accept="image/*" capture="environment" aria-label="Pilih file gambar">
+                <!-- Tabs -->
+                <div class="tabs">
+                    <button type="button" class="tab active" onclick="app.switchTab('upload')">
+                        <span class="tab-icon">📷</span>
+                        <span class="tab-text">Scan Gambar (OCR)</span>
+                    </button>
+                    <button type="button" class="tab" onclick="app.switchTab('manual')">
+                        <span class="tab-icon">⌨️</span>
+                        <span class="tab-text">Input Manual</span>
+                    </button>
                 </div>
                 
-                <div class="preview-container hidden" id="previewContainer">
-                    <h4>Preview Gambar:</h4>
-                    <img id="previewImage" class="preview-image" alt="Preview lembar jawaban">
+                <!-- Tab Upload -->
+                <div id="uploadTab" class="tab-content active">
+                    <div class="student-info-row">
+                        <div class="input-group">
+                            <label for="studentNameUpload">Nama Siswa:</label>
+                            <input type="text" id="studentNameUpload" placeholder="Masukkan nama lengkap" autocomplete="name">
+                        </div>
+                        <div class="input-group">
+                            <label for="studentClassUpload">Kelas:</label>
+                            <input type="text" id="studentClassUpload" placeholder="Contoh: 10A" autocomplete="off">
+                        </div>
+                    </div>
+                    
+                    <div class="upload-area" id="uploadArea" role="button" tabindex="0" aria-label="Upload gambar lembar jawaban">
+                        <div class="upload-icon">📷</div>
+                        <h3>Klik atau Drop Gambar Disini</h3>
+                        <p class="upload-hint">JPG, PNG, GIF, BMP, WEBP (Max 10MB)</p>
+                        <p class="upload-subhint">Pastikan gambar jelas dan jawaban terbaca</p>
+                        <input type="file" id="fileInput" class="file-input" accept="image/*" capture="environment">
+                    </div>
+                    
+                    <div class="preview-container hidden" id="previewContainer">
+                        <div class="preview-header">
+                            <h4>Preview Gambar</h4>
+                            <button type="button" class="btn-icon" onclick="app.clearImage()" title="Hapus">✕</button>
+                        </div>
+                        <img id="previewImage" class="preview-image" alt="Preview lembar jawaban">
+                        
+                        <div class="action-buttons">
+                            <button type="button" class="btn-primary" onclick="ocrHandler.processImage()" id="processBtn">
+                                <span>🔍</span> Proses Gambar (OCR)
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="progress-container hidden" id="progressContainer">
+                        <div class="progress-header">
+                            <h4>Memproses Gambar...</h4>
+                            <span class="progress-percent" id="progressPercent">0%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressFill"></div>
+                        </div>
+                        <p class="progress-status" id="progressText">Menginisialisasi OCR engine...</p>
+                    </div>
+                    
+                    <div class="ocr-result hidden" id="ocrResult">
+                        <div class="ocr-header">
+                            <h4>Hasil Pembacaan OCR</h4>
+                            <span class="ocr-badge" id="ocrBadge">0 terdeteksi</span>
+                        </div>
+                        
+                        <div class="ocr-tabs">
+                            <button class="ocr-tab active" onclick="app.switchOcrTab('answers')">Jawaban</button>
+                            <button class="ocr-tab" onclick="app.switchOcrTab('text')">Teks Mentah</button>
+                        </div>
+                        
+                        <div class="ocr-tab-content active" id="ocrTabAnswers">
+                            <div class="extracted-answers" id="extractedAnswers"></div>
+                        </div>
+                        
+                        <div class="ocr-tab-content" id="ocrTabText">
+                            <div class="ocr-text" id="ocrText"></div>
+                        </div>
+                        
+                        <div class="ocr-actions">
+                            <button type="button" class="btn-success" onclick="app.useExtractedAnswers()">
+                                <span>✅</span> Gunakan Jawaban Ini
+                            </button>
+                            <button type="button" class="btn-secondary" onclick="app.editExtractedAnswers()">
+                                <span>✏️</span> Edit Manual
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Tab Manual -->
+                <div id="manualTab" class="tab-content">
+                    <div class="student-info-row">
+                        <div class="input-group">
+                            <label for="studentNameManual">Nama Siswa:</label>
+                            <input type="text" id="studentNameManual" placeholder="Masukkan nama lengkap" autocomplete="name">
+                        </div>
+                        <div class="input-group">
+                            <label for="studentClassManual">Kelas:</label>
+                            <input type="text" id="studentClassManual" placeholder="Contoh: 10A" autocomplete="off">
+                        </div>
+                    </div>
+                    
+                    <div id="manualInputsContainer"></div>
                     
                     <div class="action-buttons">
-                        <button type="button" onclick="ocrHandler.processImage()" id="processBtn">
-                            <span>🔍</span> Proses Gambar (OCR)
-                        </button>
-                        <button type="button" class="btn-danger" onclick="app.clearImage()">
-                            <span>🗑️</span> Hapus Gambar
+                        <button type="button" class="btn-success" onclick="app.checkManualAnswers()">
+                            <span>✓</span> Periksa Jawaban
                         </button>
                     </div>
                 </div>
-                
-                <div class="progress-container hidden" id="progressContainer">
-                    <h4>Memproses Gambar...</h4>
-                    <div class="progress-bar">
-                        <div class="progress-fill" id="progressFill">0%</div>
-                    </div>
-                    <p id="progressText">Menginisialisasi OCR...</p>
-                </div>
-                
-                <div class="ocr-result hidden" id="ocrResult">
-                    <h4>Hasil OCR (Teks Terdeteksi):</h4>
-                    <div class="ocr-text" id="ocrText"></div>
-                    
-                    <div class="extracted-section">
-                        <h4>Jawaban Terdeteksi:</h4>
-                        <div class="extracted-answers" id="extractedAnswers"></div>
-                    </div>
-                    
-                    <div class="action-buttons">
-                        <button type="button" class="btn-success" onclick="app.useExtractedAnswers()">
-                            <span>✅</span> Gunakan Jawaban Terdeteksi
-                        </button>
-                        <button type="button" class="btn-warning" onclick="app.editExtractedAnswers()">
-                            <span>✏️</span> Edit Jawaban
-                        </button>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Tab Manual -->
-            <div id="manualTab" class="tab-content">
-                <div class="input-group">
-                    <label for="studentNameManual">Nama Siswa:</label>
-                    <input type="text" id="studentNameManual" placeholder="Masukkan nama siswa" autocomplete="name">
-                </div>
-                
-                <div id="manualInputsContainer"></div>
-                
-                <button type="button" class="btn-success" onclick="app.checkManualAnswers()">
-                    <span>🔍</span> Periksa Jawaban
-                </button>
-            </div>
-        </section>
+            </section>
 
-        <!-- Section 3: Hasil Pemeriksaan -->
-        <section class="section hidden" id="resultSection">
-            <div class="section-title">📊 Hasil Pemeriksaan</div>
-            
-            <div class="result-box">
-                <div class="student-name">Nama Siswa: <strong id="resultName">-</strong></div>
-                <div class="score-display" id="scoreDisplay">0</div>
-                <div class="score-label">Nilai Akhir (Skala 100)</div>
+            <!-- Section 3: Hasil Pemeriksaan -->
+            <section class="section hidden" id="resultSection">
+                <div class="section-header">
+                    <div class="section-title">📊 Hasil Pemeriksaan</div>
+                    <div class="result-actions-top">
+                        <button type="button" class="btn-icon" onclick="app.resetForNewStudent()" title="Siswa Baru">🔄</button>
+                    </div>
+                </div>
                 
-                <div class="stats">
-                    <div class="stat-item">
-                        <div class="stat-value correct-count" id="correctCount">0</div>
-                        <div class="stat-label">Benar ✅</div>
+                <div class="result-card">
+                    <div class="result-header">
+                        <div class="student-info">
+                            <h3 id="resultName">-</h3>
+                            <span class="student-class" id="resultClass">-</span>
+                        </div>
+                        <div class="exam-type-badge" id="resultExamType">UTS</div>
                     </div>
-                    <div class="stat-item">
-                        <div class="stat-value wrong-count" id="wrongCount">0</div>
-                        <div class="stat-label">Salah ❌</div>
+                    
+                    <div class="score-circle">
+                        <svg viewBox="0 0 120 120" class="score-svg">
+                            <circle class="score-bg" cx="60" cy="60" r="54"/>
+                            <circle class="score-progress" id="scoreCircle" cx="60" cy="60" r="54"/>
+                        </svg>
+                        <div class="score-content">
+                            <span class="score-number" id="scoreDisplay">0</span>
+                            <span class="score-label">Nilai</span>
+                        </div>
                     </div>
-                    <div class="stat-item">
-                        <div class="stat-value empty-count" id="emptyCount">0</div>
-                        <div class="stat-label">Kosong ⚠️</div>
+                    
+                    <div class="stats-row">
+                        <div class="stat-card correct">
+                            <div class="stat-icon">✓</div>
+                            <div class="stat-info">
+                                <span class="stat-value" id="correctCount">0</span>
+                                <span class="stat-label">Benar</span>
+                            </div>
+                        </div>
+                        <div class="stat-card wrong">
+                            <div class="stat-icon">✕</div>
+                            <div class="stat-info">
+                                <span class="stat-value" id="wrongCount">0</span>
+                                <span class="stat-label">Salah</span>
+                            </div>
+                        </div>
+                        <div class="stat-card empty">
+                            <div class="stat-icon">−</div>
+                            <div class="stat-info">
+                                <span class="stat-value" id="emptyCount">0</span>
+                                <span class="stat-label">Kosong</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
-            
-            <div class="detail-section">
-                <div class="section-title">Detail Perbandingan</div>
-                <div class="answers-grid" id="detailGrid"></div>
-            </div>
-            
-            <div class="table-section">
-                <div class="section-title">Tabel Detail</div>
-                <div class="table-wrapper">
-                    <table class="comparison-table">
-                        <thead>
-                            <tr>
-                                <th>No</th>
-                                <th>Kunci</th>
-                                <th>Siswa</th>
-                                <th>Status</th>
-                                <th>Ket</th>
-                            </tr>
-                        </thead>
-                        <tbody id="comparisonTableBody"></tbody>
-                    </table>
+                
+                <div class="detail-section">
+                    <div class="section-subtitle">Detail Perbandingan</div>
+                    <div class="answers-grid" id="detailGrid"></div>
                 </div>
-            </div>
-            
-            <div class="action-buttons center">
-                <button type="button" onclick="app.resetForNewStudent()">
-                    <span>🔄</span> Periksa Siswa Lain
-                </button>
-                <button type="button" class="btn-success" onclick="app.exportResults()">
-                    <span>📥</span> Export CSV
-                </button>
-                <button type="button" class="btn-warning" onclick="window.print()">
-                    <span>🖨️</span> Print
-                </button>
-            </div>
-        </section>
+                
+                <div class="table-section">
+                    <div class="section-subtitle">Tabel Detail</div>
+                    <div class="table-wrapper">
+                        <table class="comparison-table">
+                            <thead>
+                                <tr>
+                                    <th>No</th>
+                                    <th>Kunci</th>
+                                    <th>Jawaban</th>
+                                    <th>Status</th>
+                                    <th>Keterangan</th>
+                                </tr>
+                            </thead>
+                            <tbody id="comparisonTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <div class="action-buttons center">
+                    <button type="button" class="btn-secondary" onclick="app.resetForNewStudent()">
+                        <span>🔄</span> Siswa Lain
+                    </button>
+                    <button type="button" class="btn-primary" onclick="app.exportResults()">
+                        <span>📥</span> Export CSV
+                    </button>
+                    <button type="button" class="btn-secondary" onclick="window.print()">
+                        <span>🖨️</span> Print
+                    </button>
+                </div>
+            </section>
+        </main>
+
+        <!-- PAGE: HISTORY -->
+        <main class="page" id="page-history">
+            <section class="section">
+                <div class="section-header">
+                    <div class="section-title">📚 Riwayat Pemeriksaan</div>
+                    <div class="history-stats" id="historyStats">0 data tersimpan</div>
+                </div>
+                
+                <div class="history-filters">
+                    <div class="search-box">
+                        <span class="search-icon">🔍</span>
+                        <input type="text" id="historySearch" placeholder="Cari nama siswa..." oninput="historyManager.search(this.value)">
+                        <button class="search-clear hidden" id="searchClear" onclick="historyManager.clearSearch()">✕</button>
+                    </div>
+                    
+                    <div class="filter-row">
+                        <div class="filter-group">
+                            <label>Jenis Ujian:</label>
+                            <select id="filterExamType" onchange="historyManager.filter()">
+                                <option value="">Semua</option>
+                                <option value="UTS">UTS</option>
+                                <option value="UAS">UAS</option>
+                                <option value="UH">UH</option>
+                                <option value="PTS">PTS</option>
+                                <option value="PAS">PAS</option>
+                                <option value="Lainnya">Lainnya</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label>Mata Pelajaran:</label>
+                            <select id="filterSubject" onchange="historyManager.filter()">
+                                <option value="">Semua</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label>Urutkan:</label>
+                            <select id="sortBy" onchange="historyManager.filter()">
+                                <option value="newest">Terbaru</option>
+                                <option value="oldest">Terlama</option>
+                                <option value="score-high">Nilai Tertinggi</option>
+                                <option value="score-low">Nilai Terendah</option>
+                                <option value="name">Nama (A-Z)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="history-list" id="historyList">
+                    <div class="empty-state">
+                        <div class="empty-icon">📭</div>
+                        <h3>Belum Ada Riwayat</h3>
+                        <p>Hasil pemeriksaan akan tersimpan otomatis di sini</p>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Toast Notification -->
+        <div class="toast-container" id="toastContainer"></div>
     </div>
 
-    <!-- External JavaScript -->
+    <!-- Modal: Detail History -->
+    <div class="modal hidden" id="historyModal">
+        <div class="modal-overlay" onclick="historyManager.closeModal()"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Detail Hasil</h3>
+                <button class="btn-icon" onclick="historyManager.closeModal()">✕</button>
+            </div>
+            <div class="modal-body" id="modalBody"></div>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" onclick="historyManager.closeModal()">Tutup</button>
+                <button type="button" class="btn-danger" onclick="historyManager.deleteCurrent()">🗑️ Hapus</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/history-manager.js"></script>
     <script src="js/ocr-handler.js"></script>
     <script src="js/app.js"></script>
-    
-    <!-- Service Worker Registration (Optional PWA) -->
-    <script>
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js').catch(err => {
-                console.log('Service Worker registration failed:', err);
-            });
-        }
-    </script>
 </body>
 </html>

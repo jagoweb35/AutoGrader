@@ -1,173 +1,168 @@
 /**
- * AutoGrader - Main Application Module
- * Pemeriksa lembar jawaban ujian dengan OCR
- * Fully responsive, mobile-optimized
+ * AutoGrader - Main Application
  */
 
 const app = {
-    // State
     answerKey: [],
     studentAnswers: [],
     extractedAnswersFromOCR: [],
     currentResult: null,
     totalQuestions: 20,
+    examConfig: {},
     
-    /**
-     * Getter untuk total questions
-     */
     getTotalQuestions() {
         return this.totalQuestions;
     },
     
-    /**
-     * Setter untuk extracted answers dari OCR
-     */
     setExtractedAnswers(answers) {
         this.extractedAnswersFromOCR = Array.isArray(answers) ? answers : [];
     },
     
     /**
-     * Generate input fields untuk kunci jawaban
+     * Show page (grading/history)
+     */
+    showPage(page) {
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+        
+        document.getElementById(`page-${page}`)?.classList.add('active');
+        document.querySelector(`[data-page="${page}"]`)?.classList.add('active');
+        
+        if (page === 'history') {
+            historyManager.render();
+        }
+    },
+    
+    /**
+     * Generate answer key inputs - FIXED GRID
      */
     generateAnswerInputs() {
         this.totalQuestions = parseInt(document.getElementById('totalQuestions').value) || 20;
         
         if (this.totalQuestions < 1 || this.totalQuestions > 200) {
-            alert('Jumlah soal harus antara 1-200');
+            this.showToast('Jumlah soal harus 1-200', 'error');
             return;
         }
         
         const container = document.getElementById('answerKeyContainer');
         
-        let html = '<div class="manual-input-grid">';
+        let html = '<div class="answer-key-grid">';
         for (let i = 1; i <= this.totalQuestions; i++) {
             html += `
-                <div class="manual-input-item">
+                <div class="answer-key-item">
                     <label for="key_${i}">No. ${i}</label>
                     <input type="text" 
                            id="key_${i}" 
                            maxlength="1" 
-                           placeholder="A-E"
+                           placeholder="?"
                            inputmode="text"
                            autocomplete="off"
                            oninput="app.validateAnswerInput(this)"
-                           onkeydown="app.handleKeyNavigation(event, ${i}, 'key')">
+                           onkeydown="app.handleKeyNav(event, ${i}, 'key')">
                 </div>
             `;
         }
         html += '</div>';
         
         container.innerHTML = html;
-        document.getElementById('saveKeyBtn').classList.remove('hidden');
+        document.getElementById('keyActions').classList.remove('hidden');
         
-        // Focus first input
-        setTimeout(() => {
-            const firstInput = document.getElementById('key_1');
-            if (firstInput) firstInput.focus();
-        }, 100);
+        // Focus first
+        setTimeout(() => document.getElementById('key_1')?.focus(), 100);
     },
     
-    /**
-     * Validasi input jawaban (hanya A-E)
-     */
     validateAnswerInput(input) {
-        const valid = ['A', 'B', 'C', 'D', 'E', 'a', 'b', 'c', 'd', 'e'];
-        const val = input.value;
+        const valid = ['A', 'B', 'C', 'D', 'E'];
+        const val = input.value.toUpperCase();
         
         if (!valid.includes(val) && val !== '') {
             input.value = '';
-            // Haptic feedback jika tersedia
             if (navigator.vibrate) navigator.vibrate(50);
         } else {
-            input.value = val.toUpperCase();
-            
-            // Auto-advance to next input
-            const currentId = input.id;
-            const match = currentId.match(/(\d+)$/);
-            if (match) {
-                const currentNum = parseInt(match[1]);
-                const nextInput = document.getElementById(currentId.replace(/\d+$/, '') + (currentNum + 1));
-                if (nextInput && val !== '') {
-                    setTimeout(() => nextInput.focus(), 50);
-                }
+            input.value = val;
+            // Auto advance
+            const match = input.id.match(/(\d+)$/);
+            if (match && val) {
+                const next = document.getElementById(input.id.replace(/\d+$/, '') + (parseInt(match[1]) + 1));
+                if (next) setTimeout(() => next.focus(), 50);
             }
         }
     },
     
-    /**
-     * Handle keyboard navigation
-     */
-    handleKeyNavigation(event, currentNum, prefix) {
-        let nextNum = null;
+    handleKeyNav(e, num, prefix) {
+        let next = null;
+        const cols = window.innerWidth >= 1280 ? 10 : window.innerWidth >= 1024 ? 8 : window.innerWidth >= 768 ? 5 : 2;
         
-        if (event.key === 'ArrowRight' || event.key === 'Enter') {
-            nextNum = currentNum + 1;
-        } else if (event.key === 'ArrowLeft') {
-            nextNum = currentNum - 1;
-        } else if (event.key === 'ArrowDown') {
-            // Estimate row size based on screen width
-            const rowSize = window.innerWidth < 576 ? 2 : window.innerWidth < 768 ? 3 : 4;
-            nextNum = currentNum + rowSize;
-        } else if (event.key === 'ArrowUp') {
-            const rowSize = window.innerWidth < 576 ? 2 : window.innerWidth < 768 ? 3 : 4;
-            nextNum = currentNum - rowSize;
-        }
+        if (e.key === 'ArrowRight' || e.key === 'Enter') next = num + 1;
+        else if (e.key === 'ArrowLeft') next = num - 1;
+        else if (e.key === 'ArrowDown') next = num + cols;
+        else if (e.key === 'ArrowUp') next = num - cols;
         
-        if (nextNum !== null && nextNum >= 1 && nextNum <= this.totalQuestions) {
-            const nextInput = document.getElementById(`${prefix}_${nextNum}`);
-            if (nextInput) {
-                event.preventDefault();
-                nextInput.focus();
-            }
+        if (next && next >= 1 && next <= this.totalQuestions) {
+            e.preventDefault();
+            document.getElementById(`${prefix}_${next}`)?.focus();
         }
     },
     
     /**
-     * Simpan kunci jawaban dan generate form siswa
+     * Save answer key
      */
     saveAnswerKey() {
         this.answerKey = [];
-        let emptyCount = 0;
+        let empty = 0;
         
         for (let i = 1; i <= this.totalQuestions; i++) {
-            const input = document.getElementById(`key_${i}`);
-            const val = input ? input.value.toUpperCase() : '';
-            if (!val) emptyCount++;
+            const val = document.getElementById(`key_${i}`)?.value.toUpperCase() || '';
+            if (!val) empty++;
             this.answerKey.push(val || '-');
         }
         
-        if (emptyCount > 0) {
-            if (!confirm(`Ada ${emptyCount} jawaban yang kosong. Lanjutkan?`)) return;
-        }
+        if (empty > 0 && !confirm(`Ada ${empty} jawaban kosong. Lanjutkan?`)) return;
         
-        // Generate manual inputs untuk siswa
+        // Save exam config
+        this.examConfig = {
+            type: document.getElementById('examType')?.value || 'Lainnya',
+            subject: document.getElementById('subject')?.value || 'Tanpa Mapel',
+            totalQuestions: this.totalQuestions
+        };
+        
+        // Update UI
+        document.getElementById('keyStatus').textContent = `${this.totalQuestions} Soal • ${this.examConfig.type}`;
+        document.getElementById('keyStatus').classList.add('active');
+        document.getElementById('examInfoDisplay').textContent = `${this.examConfig.type} • ${this.examConfig.subject}`;
+        
+        // Generate student inputs
         this.generateStudentInputs();
         
-        // Show student section dengan animasi
-        const studentSection = document.getElementById('studentSection');
-        studentSection.classList.remove('hidden');
-        
-        // Scroll dengan offset untuk mobile
+        // Show student section
+        document.getElementById('studentSection').classList.remove('hidden');
         setTimeout(() => {
             const offset = window.innerWidth < 768 ? 80 : 100;
-            const top = studentSection.getBoundingClientRect().top + window.pageYOffset - offset;
+            const top = document.getElementById('studentSection').getBoundingClientRect().top + window.pageYOffset - offset;
             window.scrollTo({ top, behavior: 'smooth' });
         }, 100);
         
-        // Initialize OCR worker di background
+        // Pre-init OCR
         if (window.ocrHandler) {
-            window.ocrHandler.initializeWorker().catch(() => {
-                // Silent fail
-            });
+            ocrHandler.initializeWorker().catch(() => {});
         }
     },
     
-    /**
-     * Generate input fields untuk jawaban siswa (manual)
-     */
+    clearAnswerKey() {
+        document.getElementById('answerKeyContainer').innerHTML = `
+            <div class="empty-state">
+                <div class="empty-icon">📋</div>
+                <p>Atur jumlah soal dan klik "Generate Form"</p>
+            </div>
+        `;
+        document.getElementById('keyActions').classList.add('hidden');
+        document.getElementById('keyStatus').textContent = 'Belum diatur';
+        document.getElementById('keyStatus').classList.remove('active');
+        this.answerKey = [];
+    },
+    
     generateStudentInputs() {
         const container = document.getElementById('manualInputsContainer');
-        
         let html = '<div class="manual-input-grid">';
         for (let i = 1; i <= this.totalQuestions; i++) {
             html += `
@@ -176,351 +171,246 @@ const app = {
                     <input type="text" 
                            id="manual_${i}" 
                            maxlength="1" 
-                           placeholder="A-E"
+                           placeholder="?"
                            inputmode="text"
                            autocomplete="off"
                            oninput="app.validateAnswerInput(this)"
-                           onkeydown="app.handleKeyNavigation(event, ${i}, 'manual')">
+                           onkeydown="app.handleKeyNav(event, ${i}, 'manual')">
                 </div>
             `;
         }
         html += '</div>';
-        
         container.innerHTML = html;
     },
     
     /**
-     * Handle file selection untuk upload gambar
+     * File handling
      */
-    handleFileSelect(event) {
-        const file = event.target.files[0];
+    handleFileSelect(e) {
+        const file = e.target.files[0];
         if (!file) return;
         
-        // Validasi file type
         if (!file.type.startsWith('image/')) {
-            alert('Mohon upload file gambar (JPG, PNG, GIF, BMP, WEBP)');
+            this.showToast('File harus gambar!', 'error');
             return;
         }
         
-        // Validasi file size (max 10MB)
         if (file.size > 10 * 1024 * 1024) {
-            alert('Ukuran file terlalu besar. Maksimal 10MB.');
+            this.showToast('Maksimal 10MB', 'error');
             return;
         }
         
         const reader = new FileReader();
-        
-        reader.onprogress = (e) => {
-            if (e.lengthComputable) {
-                const percent = Math.round((e.loaded / e.total) * 100);
-                console.log('Loading image:', percent + '%');
-            }
-        };
-        
         reader.onload = (e) => {
             const img = document.getElementById('previewImage');
             img.src = e.target.result;
             img.onload = () => {
                 document.getElementById('previewContainer').classList.remove('hidden');
-                
-                // Scroll ke preview di mobile
-                if (window.innerWidth < 768) {
-                    setTimeout(() => {
-                        document.getElementById('previewContainer').scrollIntoView({ 
-                            behavior: 'smooth', 
-                            block: 'nearest' 
-                        });
-                    }, 100);
-                }
             };
         };
-        
-        reader.onerror = () => {
-            alert('Gagal membaca file. Coba file lain.');
-        };
-        
         reader.readAsDataURL(file);
     },
     
-    /**
-     * Clear gambar yang diupload
-     */
     clearImage() {
-        const fileInput = document.getElementById('fileInput');
-        const previewContainer = document.getElementById('previewContainer');
-        const ocrResult = document.getElementById('ocrResult');
-        const progressContainer = document.getElementById('progressContainer');
-        const previewImage = document.getElementById('previewImage');
-        
-        if (fileInput) fileInput.value = '';
-        if (previewContainer) previewContainer.classList.add('hidden');
-        if (ocrResult) ocrResult.classList.add('hidden');
-        if (progressContainer) progressContainer.classList.add('hidden');
-        if (previewImage) previewImage.src = '';
-        
+        document.getElementById('fileInput').value = '';
+        document.getElementById('previewContainer').classList.add('hidden');
+        document.getElementById('ocrResult').classList.add('hidden');
+        document.getElementById('progressContainer').classList.add('hidden');
         this.extractedAnswersFromOCR = [];
     },
     
-    /**
-     * Gunakan jawaban hasil OCR
-     */
     useExtractedAnswers() {
         this.studentAnswers = [...this.extractedAnswersFromOCR];
-        const studentName = document.getElementById('studentNameUpload').value.trim() || 'Siswa';
-        
-        if (!studentName || studentName === 'Siswa') {
-            // Scroll ke nama input
+        const name = document.getElementById('studentNameUpload').value.trim();
+        if (!name) {
             document.getElementById('studentNameUpload').focus();
+            this.showToast('Isi nama siswa!', 'warning');
             return;
         }
-        
-        this.checkAndShowResults(studentName);
+        this.checkAndShowResults(name, document.getElementById('studentClassUpload').value);
     },
     
-    /**
-     * Edit jawaban hasil OCR (switch ke manual)
-     */
     editExtractedAnswers() {
         this.switchTab('manual');
+        document.getElementById('studentNameManual').value = document.getElementById('studentNameUpload').value;
+        document.getElementById('studentClassManual').value = document.getElementById('studentClassUpload').value;
         
-        const uploadName = document.getElementById('studentNameUpload').value;
-        document.getElementById('studentNameManual').value = uploadName;
-        
-        // Fill manual inputs dengan hasil OCR
-        this.extractedAnswersFromOCR.forEach((ans, idx) => {
-            const input = document.getElementById(`manual_${idx + 1}`);
-            if (input && ans !== '-') {
-                input.value = ans;
-            }
+        this.extractedAnswersFromOCR.forEach((ans, i) => {
+            const input = document.getElementById(`manual_${i + 1}`);
+            if (input && ans !== '-') input.value = ans;
         });
-        
-        // Scroll ke form
-        setTimeout(() => {
-            document.getElementById('manualInputsContainer').scrollIntoView({ 
-                behavior: 'smooth', 
-                block: 'start' 
-            });
-        }, 100);
     },
     
-    /**
-     * Check jawaban manual
-     */
     checkManualAnswers() {
         this.studentAnswers = [];
-        const studentName = document.getElementById('studentNameManual').value.trim() || 'Siswa';
+        const name = document.getElementById('studentNameManual').value.trim();
         
         for (let i = 1; i <= this.totalQuestions; i++) {
-            const input = document.getElementById(`manual_${i}`);
-            const val = input ? input.value.toUpperCase() : '';
+            const val = document.getElementById(`manual_${i}`)?.value.toUpperCase() || '';
             this.studentAnswers.push(val || '-');
         }
         
-        this.checkAndShowResults(studentName);
+        this.checkAndShowResults(name, document.getElementById('studentClassManual').value);
     },
     
     /**
-     * Core checking logic
+     * Core check logic
      */
-    checkAndShowResults(studentName) {
-        let correct = 0;
-        let wrong = 0;
-        let empty = 0;
+    checkAndShowResults(name, studentClass) {
+        if (!name) {
+            this.showToast('Nama siswa wajib diisi!', 'error');
+            return;
+        }
+        
+        let correct = 0, wrong = 0, empty = 0;
         const details = [];
         
         for (let i = 0; i < this.totalQuestions; i++) {
             const key = this.answerKey[i];
-            const answer = this.studentAnswers[i];
+            const ans = this.studentAnswers[i];
             
-            if (answer === '-') {
+            if (ans === '-') {
                 empty++;
-                details.push({ no: i + 1, key, answer, status: 'empty' });
-            } else if (answer === key) {
+                details.push({ no: i + 1, key, answer: ans, status: 'empty' });
+            } else if (ans === key) {
                 correct++;
-                details.push({ no: i + 1, key, answer, status: 'correct' });
+                details.push({ no: i + 1, key, answer: ans, status: 'correct' });
             } else {
                 wrong++;
-                details.push({ no: i + 1, key, answer, status: 'wrong' });
+                details.push({ no: i + 1, key, answer: ans, status: 'wrong' });
             }
         }
         
         const score = this.totalQuestions > 0 ? (correct / this.totalQuestions) * 100 : 0;
         
         this.currentResult = {
-            name: studentName,
-            correct,
-            wrong,
-            empty,
+            name,
+            class: studentClass || '-',
+            correct, wrong, empty,
             score: score.toFixed(2),
             details,
-            timestamp: new Date().toISOString()
+            examType: this.examConfig.type,
+            subject: this.examConfig.subject,
+            totalQuestions: this.totalQuestions
         };
         
-        this.displayResults(studentName, score, correct, wrong, empty, details);
+        // Save to history
+        historyManager.add({...this.currentResult});
+        
+        this.displayResults(score, correct, wrong, empty, details);
     },
     
-    /**
-     * Display hasil pemeriksaan
-     */
-    displayResults(name, score, correct, wrong, empty, details) {
-        // Update score box
-        document.getElementById('resultName').textContent = name;
-        document.getElementById('scoreDisplay').textContent = score.toFixed(2);
+    displayResults(score, correct, wrong, empty, details) {
+        document.getElementById('resultName').textContent = this.currentResult.name;
+        document.getElementById('resultClass').textContent = `${this.currentResult.class} • ${this.currentResult.subject}`;
+        document.getElementById('resultExamType').textContent = this.currentResult.examType;
+        document.getElementById('scoreDisplay').textContent = score.toFixed(1);
         document.getElementById('correctCount').textContent = correct;
         document.getElementById('wrongCount').textContent = wrong;
         document.getElementById('emptyCount').textContent = empty;
         
-        // Detail grid
-        const grid = document.getElementById('detailGrid');
-        grid.innerHTML = details.map(d => `
-            <div class="answer-item ${d.status}" onclick="app.scrollToTableRow(${d.no})">
+        // Animate score circle
+        const circle = document.getElementById('scoreCircle');
+        const circumference = 2 * Math.PI * 54;
+        const offset = circumference - (score / 100) * circumference;
+        setTimeout(() => {
+            circle.style.strokeDashoffset = offset;
+        }, 100);
+        
+        // Grid
+        document.getElementById('detailGrid').innerHTML = details.map(d => `
+            <div class="answer-item ${d.status}" onclick="app.scrollToRow(${d.no})">
                 <div class="answer-number">No. ${d.no}</div>
                 <div class="answer-value">${d.answer !== '-' ? d.answer : '?'}</div>
-                <div class="answer-key">Kunci: ${d.key}</div>
-                <div style="margin-top: 8px; font-size: 1.3em;">
-                    ${d.status === 'correct' ? '✅' : d.status === 'wrong' ? '❌' : '⚠️'}
-                </div>
+                <div class="answer-key">K: ${d.key}</div>
             </div>
         `).join('');
         
-        // Comparison table
-        const tableBody = document.getElementById('comparisonTableBody');
-        tableBody.innerHTML = details.map(d => {
-            const statusClass = d.status === 'correct' ? 'badge-success' : 
-                               d.status === 'wrong' ? 'badge-danger' : 'badge-warning';
-            const statusText = d.status === 'correct' ? 'Benar' : 
-                              d.status === 'wrong' ? 'Salah' : 'Kosong';
-            const keterangan = d.status === 'correct' ? 'Jawaban sesuai kunci' :
-                              d.status === 'wrong' ? `Seharusnya ${d.key}` :
-                              'Tidak dijawab';
-            
-            return `
-                <tr id="row-${d.no}">
-                    <td><strong>${d.no}</strong></td>
-                    <td><strong>${d.key}</strong></td>
-                    <td>${d.answer !== '-' ? d.answer : '<em style="color: #999;">-</em>'}</td>
-                    <td><span class="status-badge ${statusClass}">${statusText}</span></td>
-                    <td>${keterangan}</td>
-                </tr>
-            `;
-        }).join('');
+        // Table
+        document.getElementById('comparisonTableBody').innerHTML = details.map(d => `
+            <tr id="row-${d.no}">
+                <td><strong>${d.no}</strong></td>
+                <td>${d.key}</td>
+                <td>${d.answer !== '-' ? d.answer : '<em>-</em>'}</td>
+                <td><span class="status-badge ${d.status}">${d.status === 'correct' ? 'Benar' : d.status === 'wrong' ? 'Salah' : 'Kosong'}</span></td>
+                <td>${d.status === 'correct' ? '✓ Sesuai' : d.status === 'wrong' ? `✗ Seharusnya ${d.key}` : '− Tidak dijawab'}</td>
+            </tr>
+        `).join('');
         
-        // Show result section
-        const resultSection = document.getElementById('resultSection');
-        resultSection.classList.remove('hidden');
-        
-        // Scroll dengan offset untuk mobile
+        document.getElementById('resultSection').classList.remove('hidden');
         setTimeout(() => {
             const offset = window.innerWidth < 768 ? 60 : 80;
-            const top = resultSection.getBoundingClientRect().top + window.pageYOffset - offset;
+            const top = document.getElementById('resultSection').getBoundingClientRect().top + window.pageYOffset - offset;
             window.scrollTo({ top, behavior: 'smooth' });
         }, 100);
     },
     
-    /**
-     * Scroll ke row tertentu di tabel
-     */
-    scrollToTableRow(rowNum) {
-        const row = document.getElementById(`row-${rowNum}`);
+    scrollToRow(no) {
+        const row = document.getElementById(`row-${no}`);
         if (row) {
             row.scrollIntoView({ behavior: 'smooth', block: 'center' });
             row.style.background = '#e0e7ff';
-            setTimeout(() => {
-                row.style.background = '';
-            }, 2000);
+            setTimeout(() => row.style.background = '', 1500);
         }
     },
     
-    /**
-     * Reset untuk siswa baru
-     */
     resetForNewStudent() {
-        // Clear inputs
-        const nameUpload = document.getElementById('studentNameUpload');
-        const nameManual = document.getElementById('studentNameManual');
-        if (nameUpload) nameUpload.value = '';
-        if (nameManual) nameManual.value = '';
-        
-        // Clear image
+        document.getElementById('studentNameUpload').value = '';
+        document.getElementById('studentNameManual').value = '';
+        document.getElementById('studentClassUpload').value = '';
+        document.getElementById('studentClassManual').value = '';
         this.clearImage();
         
-        // Clear manual inputs
         for (let i = 1; i <= this.totalQuestions; i++) {
             const input = document.getElementById(`manual_${i}`);
             if (input) input.value = '';
         }
         
-        // Hide result
         document.getElementById('resultSection').classList.add('hidden');
-        
-        // Reset tabs ke upload
         this.switchTab('upload');
         
-        // Scroll ke student section
         setTimeout(() => {
             const offset = window.innerWidth < 768 ? 60 : 80;
-            const section = document.getElementById('studentSection');
-            const top = section.getBoundingClientRect().top + window.pageYOffset - offset;
+            const top = document.getElementById('studentSection').getBoundingClientRect().top + window.pageYOffset - offset;
             window.scrollTo({ top, behavior: 'smooth' });
         }, 100);
     },
     
-    /**
-     * Export hasil ke CSV
-     */
     exportResults() {
-        if (!this.currentResult) {
-            alert('Tidak ada hasil untuk diexport');
-            return;
-        }
+        if (!this.currentResult) return;
         
-        let csv = '\uFEFF'; // BOM for Excel UTF-8
-        
-        // Header
-        csv += 'No,Kunci Jawaban,Jawaban Siswa,Status,Keterangan\n';
-        
-        // Data
+        let csv = '\uFEFF';
+        csv += 'No,Kunci,Jawaban,Status,Keterangan\n';
         this.currentResult.details.forEach(d => {
             const status = d.status === 'correct' ? 'Benar' : d.status === 'wrong' ? 'Salah' : 'Kosong';
-            const keterangan = d.status === 'correct' ? 'Jawaban sesuai kunci' :
-                              d.status === 'wrong' ? `Jawaban seharusnya ${d.key}` :
-                              'Tidak dijawab';
-            csv += `${d.no},${d.key},${d.answer},${status},${keterangan}\n`;
+            const ket = d.status === 'correct' ? 'Sesuai kunci' : d.status === 'wrong' ? `Seharusnya ${d.key}` : 'Tidak dijawab';
+            csv += `${d.no},${d.key},${d.answer},${status},${ket}\n`;
         });
         
-        // Summary
-        csv += `\nNama Siswa,${this.currentResult.name}\n`;
+        csv += `\nNama,${this.currentResult.name}\n`;
+        csv += `Kelas,${this.currentResult.class}\n`;
+        csv += `Jenis Ujian,${this.currentResult.examType}\n`;
+        csv += `Mapel,${this.currentResult.subject}\n`;
         csv += `Benar,${this.currentResult.correct}\n`;
         csv += `Salah,${this.currentResult.wrong}\n`;
         csv += `Kosong,${this.currentResult.empty}\n`;
         csv += `Nilai,${this.currentResult.score}\n`;
         csv += `Tanggal,${new Date().toLocaleString('id-ID')}\n`;
         
-        // Download
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        
-        const timestamp = new Date().toISOString().split('T')[0];
-        const safeName = this.currentResult.name.replace(/[^a-z0-9]/gi, '_').substring(0, 30);
-        link.download = `ExamScan_${safeName}_${timestamp}.csv`;
-        
-        // Trigger download
+        link.download = `AutoGrader_${this.currentResult.name.replace(/[^a-z0-9]/gi, '_')}_${new Date().toISOString().split('T')[0]}.csv`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
         
-        // Feedback
-        if (navigator.vibrate) navigator.vibrate([50, 100, 50]);
+        this.showToast('File CSV berhasil diunduh!', 'success');
     },
     
-    /**
-     * Switch tab (upload/manual)
-     */
     switchTab(tab) {
-        // Update tab buttons
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
         document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
         
@@ -531,34 +421,39 @@ const app = {
             document.querySelectorAll('.tab')[1]?.classList.add('active');
             document.getElementById('manualTab')?.classList.add('active');
         }
+    },
+    
+    switchOcrTab(tab) {
+        document.querySelectorAll('.ocr-tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.ocr-tab-content').forEach(t => t.classList.remove('active'));
+        
+        if (tab === 'answers') {
+            document.querySelectorAll('.ocr-tab')[0]?.classList.add('active');
+            document.getElementById('ocrTabAnswers')?.classList.add('active');
+        } else {
+            document.querySelectorAll('.ocr-tab')[1]?.classList.add('active');
+            document.getElementById('ocrTabText')?.classList.add('active');
+        }
+    },
+    
+    showToast(message, type = 'info') {
+        const container = document.getElementById('toastContainer');
+        const toast = document.createElement('div');
+        toast.className = 'toast';
+        toast.textContent = message;
+        toast.style.background = type === 'error' ? '#dc2626' : type === 'success' ? '#16a34a' : type === 'warning' ? '#d97706' : '#1f2937';
+        container.appendChild(toast);
+        
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateY(20px)';
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
     }
 };
 
-// Expose to global
 window.app = app;
 
-// Event listeners saat DOM ready
 document.addEventListener('DOMContentLoaded', () => {
-    // File input handler
-    const fileInput = document.getElementById('fileInput');
-    if (fileInput) {
-        fileInput.addEventListener('change', (e) => app.handleFileSelect(e));
-    }
-    
-    // Handle visibility change untuk pause/resume OCR
-    document.addEventListener('visibilitychange', () => {
-        if (document.hidden && window.ocrHandler) {
-            // Pause processing if needed
-            console.log('Tab hidden, OCR processing paused');
-        }
-    });
-    
-    // Handle online/offline
-    window.addEventListener('online', () => {
-        console.log('Connection restored');
-    });
-    
-    window.addEventListener('offline', () => {
-        alert('Koneksi internet terputus. Beberapa fitur mungkin tidak berfungsi.');
-    });
+    document.getElementById('fileInput')?.addEventListener('change', (e) => app.handleFileSelect(e));
 });
