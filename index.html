@@ -2,20 +2,36 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ExamScan - Pemeriksa Lembar Jawaban Ujian</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="format-detection" content="telephone=no">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="description" content="AutoGrader - Aplikasi pemeriksa lembar jawaban ujian otomatis dengan OCR">
+    
+    <title>AutoGrader - Pemeriksa Lembar Jawaban Ujian</title>
+    
+    <!-- Preconnect for performance -->
+    <link rel="preconnect" href="https://cdn.jsdelivr.net">
     
     <!-- External CSS -->
     <link rel="stylesheet" href="css/style.css">
     
     <!-- Tesseract.js CDN -->
-    <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    
+    <!-- PWA Manifest (Optional) -->
+    <link rel="manifest" href="manifest.json">
+    
+    <!-- Icons -->
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📋</text></svg>">
 </head>
 <body>
     <div class="container">
         <!-- Header -->
         <header class="app-header">
-            <h1>📋 ExamScan</h1>
+            <h1>📋 AutoGrader</h1>
             <p class="subtitle">Scanner & Pemeriksa Lembar Jawaban Ujian Otomatis</p>
         </header>
 
@@ -25,8 +41,8 @@
             
             <div class="input-group">
                 <label for="totalQuestions">Jumlah Soal:</label>
-                <input type="number" id="totalQuestions" value="20" min="1" max="100">
-                <button onclick="app.generateAnswerInputs()">Generate Form</button>
+                <input type="number" id="totalQuestions" value="20" min="1" max="100" inputmode="numeric">
+                <button type="button" onclick="app.generateAnswerInputs()">Generate Form</button>
             </div>
             
             <div id="answerKeyContainer">
@@ -36,7 +52,7 @@
                 </div>
             </div>
             
-            <button class="btn-success hidden" id="saveKeyBtn" onclick="app.saveAnswerKey()">
+            <button type="button" class="btn-success hidden" id="saveKeyBtn" onclick="app.saveAnswerKey()">
                 💾 Simpan Kunci Jawaban
             </button>
         </section>
@@ -47,34 +63,40 @@
             
             <!-- Tabs -->
             <div class="tabs">
-                <button class="tab active" onclick="app.switchTab('upload')">📤 Upload Gambar (OCR)</button>
-                <button class="tab" onclick="app.switchTab('manual')">⌨️ Input Manual</button>
+                <button type="button" class="tab active" onclick="app.switchTab('upload')">
+                    <span>📤</span> Upload Gambar (OCR)
+                </button>
+                <button type="button" class="tab" onclick="app.switchTab('manual')">
+                    <span>⌨️</span> Input Manual
+                </button>
             </div>
             
             <!-- Tab Upload -->
             <div id="uploadTab" class="tab-content active">
                 <div class="input-group">
                     <label for="studentNameUpload">Nama Siswa:</label>
-                    <input type="text" id="studentNameUpload" placeholder="Masukkan nama siswa">
+                    <input type="text" id="studentNameUpload" placeholder="Masukkan nama siswa" autocomplete="name">
                 </div>
                 
-                <div class="upload-area" id="uploadArea">
+                <div class="upload-area" id="uploadArea" role="button" tabindex="0" aria-label="Upload gambar lembar jawaban">
                     <div class="upload-icon">📷</div>
                     <h3>Klik atau Drop Gambar Disini</h3>
                     <p class="upload-hint">Format: JPG, PNG, GIF, BMP, WEBP</p>
                     <p class="upload-subhint">Pastikan gambar jelas dan jawaban terbaca</p>
-                    <input type="file" id="fileInput" class="file-input" accept="image/*">
+                    <input type="file" id="fileInput" class="file-input" accept="image/*" capture="environment" aria-label="Pilih file gambar">
                 </div>
                 
                 <div class="preview-container hidden" id="previewContainer">
                     <h4>Preview Gambar:</h4>
-                    <img id="previewImage" class="preview-image" alt="Preview">
+                    <img id="previewImage" class="preview-image" alt="Preview lembar jawaban">
                     
                     <div class="action-buttons">
-                        <button onclick="ocrHandler.processImage()" id="processBtn">
-                            🔍 Proses Gambar (OCR)
+                        <button type="button" onclick="ocrHandler.processImage()" id="processBtn">
+                            <span>🔍</span> Proses Gambar (OCR)
                         </button>
-                        <button class="btn-danger" onclick="app.clearImage()">🗑️ Hapus Gambar</button>
+                        <button type="button" class="btn-danger" onclick="app.clearImage()">
+                            <span>🗑️</span> Hapus Gambar
+                        </button>
                     </div>
                 </div>
                 
@@ -96,11 +118,11 @@
                     </div>
                     
                     <div class="action-buttons">
-                        <button class="btn-success" onclick="app.useExtractedAnswers()">
-                            ✅ Gunakan Jawaban Terdeteksi
+                        <button type="button" class="btn-success" onclick="app.useExtractedAnswers()">
+                            <span>✅</span> Gunakan Jawaban Terdeteksi
                         </button>
-                        <button class="btn-warning" onclick="app.editExtractedAnswers()">
-                            ✏️ Edit Jawaban
+                        <button type="button" class="btn-warning" onclick="app.editExtractedAnswers()">
+                            <span>✏️</span> Edit Jawaban
                         </button>
                     </div>
                 </div>
@@ -110,13 +132,13 @@
             <div id="manualTab" class="tab-content">
                 <div class="input-group">
                     <label for="studentNameManual">Nama Siswa:</label>
-                    <input type="text" id="studentNameManual" placeholder="Masukkan nama siswa">
+                    <input type="text" id="studentNameManual" placeholder="Masukkan nama siswa" autocomplete="name">
                 </div>
                 
                 <div id="manualInputsContainer"></div>
                 
-                <button class="btn-success" onclick="app.checkManualAnswers()">
-                    🔍 Periksa Jawaban
+                <button type="button" class="btn-success" onclick="app.checkManualAnswers()">
+                    <span>🔍</span> Periksa Jawaban
                 </button>
             </div>
         </section>
@@ -158,10 +180,10 @@
                         <thead>
                             <tr>
                                 <th>No</th>
-                                <th>Kunci Jawaban</th>
-                                <th>Jawaban Siswa</th>
+                                <th>Kunci</th>
+                                <th>Siswa</th>
                                 <th>Status</th>
-                                <th>Keterangan</th>
+                                <th>Ket</th>
                             </tr>
                         </thead>
                         <tbody id="comparisonTableBody"></tbody>
@@ -170,9 +192,15 @@
             </div>
             
             <div class="action-buttons center">
-                <button onclick="app.resetForNewStudent()">🔄 Periksa Siswa Lain</button>
-                <button class="btn-success" onclick="app.exportResults()">📥 Export Hasil (CSV)</button>
-                <button class="btn-warning" onclick="window.print()">🖨️ Print Hasil</button>
+                <button type="button" onclick="app.resetForNewStudent()">
+                    <span>🔄</span> Periksa Siswa Lain
+                </button>
+                <button type="button" class="btn-success" onclick="app.exportResults()">
+                    <span>📥</span> Export CSV
+                </button>
+                <button type="button" class="btn-warning" onclick="window.print()">
+                    <span>🖨️</span> Print
+                </button>
             </div>
         </section>
     </div>
@@ -180,5 +208,14 @@
     <!-- External JavaScript -->
     <script src="js/ocr-handler.js"></script>
     <script src="js/app.js"></script>
+    
+    <!-- Service Worker Registration (Optional PWA) -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js').catch(err => {
+                console.log('Service Worker registration failed:', err);
+            });
+        }
+    </script>
 </body>
 </html>

@@ -1,6 +1,7 @@
 /**
- * ExamScan - Main Application Module
- * Mengelola logika aplikasi pemeriksa lembar jawaban
+ * AutoGrader - Main Application Module
+ * Pemeriksa lembar jawaban ujian dengan OCR
+ * Fully responsive, mobile-optimized
  */
 
 const app = {
@@ -12,7 +13,7 @@ const app = {
     totalQuestions: 20,
     
     /**
-     * Getter untuk total questions (digunakan oleh OCR handler)
+     * Getter untuk total questions
      */
     getTotalQuestions() {
         return this.totalQuestions;
@@ -22,7 +23,7 @@ const app = {
      * Setter untuk extracted answers dari OCR
      */
     setExtractedAnswers(answers) {
-        this.extractedAnswersFromOCR = answers;
+        this.extractedAnswersFromOCR = Array.isArray(answers) ? answers : [];
     },
     
     /**
@@ -30,6 +31,12 @@ const app = {
      */
     generateAnswerInputs() {
         this.totalQuestions = parseInt(document.getElementById('totalQuestions').value) || 20;
+        
+        if (this.totalQuestions < 1 || this.totalQuestions > 200) {
+            alert('Jumlah soal harus antara 1-200');
+            return;
+        }
+        
         const container = document.getElementById('answerKeyContainer');
         
         let html = '<div class="manual-input-grid">';
@@ -41,7 +48,10 @@ const app = {
                            id="key_${i}" 
                            maxlength="1" 
                            placeholder="A-E"
-                           oninput="app.validateAnswerInput(this)">
+                           inputmode="text"
+                           autocomplete="off"
+                           oninput="app.validateAnswerInput(this)"
+                           onkeydown="app.handleKeyNavigation(event, ${i}, 'key')">
                 </div>
             `;
         }
@@ -49,6 +59,12 @@ const app = {
         
         container.innerHTML = html;
         document.getElementById('saveKeyBtn').classList.remove('hidden');
+        
+        // Focus first input
+        setTimeout(() => {
+            const firstInput = document.getElementById('key_1');
+            if (firstInput) firstInput.focus();
+        }, 100);
     },
     
     /**
@@ -60,17 +76,50 @@ const app = {
         
         if (!valid.includes(val) && val !== '') {
             input.value = '';
-            this.showAlert('Hanya boleh A, B, C, D, atau E', 'warning');
+            // Haptic feedback jika tersedia
+            if (navigator.vibrate) navigator.vibrate(50);
         } else {
             input.value = val.toUpperCase();
+            
+            // Auto-advance to next input
+            const currentId = input.id;
+            const match = currentId.match(/(\d+)$/);
+            if (match) {
+                const currentNum = parseInt(match[1]);
+                const nextInput = document.getElementById(currentId.replace(/\d+$/, '') + (currentNum + 1));
+                if (nextInput && val !== '') {
+                    setTimeout(() => nextInput.focus(), 50);
+                }
+            }
         }
     },
     
     /**
-     * Show alert sederhana
+     * Handle keyboard navigation
      */
-    showAlert(message, type = 'info') {
-        alert(message);
+    handleKeyNavigation(event, currentNum, prefix) {
+        let nextNum = null;
+        
+        if (event.key === 'ArrowRight' || event.key === 'Enter') {
+            nextNum = currentNum + 1;
+        } else if (event.key === 'ArrowLeft') {
+            nextNum = currentNum - 1;
+        } else if (event.key === 'ArrowDown') {
+            // Estimate row size based on screen width
+            const rowSize = window.innerWidth < 576 ? 2 : window.innerWidth < 768 ? 3 : 4;
+            nextNum = currentNum + rowSize;
+        } else if (event.key === 'ArrowUp') {
+            const rowSize = window.innerWidth < 576 ? 2 : window.innerWidth < 768 ? 3 : 4;
+            nextNum = currentNum - rowSize;
+        }
+        
+        if (nextNum !== null && nextNum >= 1 && nextNum <= this.totalQuestions) {
+            const nextInput = document.getElementById(`${prefix}_${nextNum}`);
+            if (nextInput) {
+                event.preventDefault();
+                nextInput.focus();
+            }
+        }
     },
     
     /**
@@ -81,7 +130,8 @@ const app = {
         let emptyCount = 0;
         
         for (let i = 1; i <= this.totalQuestions; i++) {
-            const val = document.getElementById(`key_${i}`).value.toUpperCase();
+            const input = document.getElementById(`key_${i}`);
+            const val = input ? input.value.toUpperCase() : '';
             if (!val) emptyCount++;
             this.answerKey.push(val || '-');
         }
@@ -93,14 +143,21 @@ const app = {
         // Generate manual inputs untuk siswa
         this.generateStudentInputs();
         
-        // Show student section
-        document.getElementById('studentSection').classList.remove('hidden');
-        document.getElementById('studentSection').scrollIntoView({ behavior: 'smooth' });
+        // Show student section dengan animasi
+        const studentSection = document.getElementById('studentSection');
+        studentSection.classList.remove('hidden');
+        
+        // Scroll dengan offset untuk mobile
+        setTimeout(() => {
+            const offset = window.innerWidth < 768 ? 80 : 100;
+            const top = studentSection.getBoundingClientRect().top + window.pageYOffset - offset;
+            window.scrollTo({ top, behavior: 'smooth' });
+        }, 100);
         
         // Initialize OCR worker di background
         if (window.ocrHandler) {
-            window.ocrHandler.initializeWorker().then(() => {
-                console.log('OCR Worker ready');
+            window.ocrHandler.initializeWorker().catch(() => {
+                // Silent fail
             });
         }
     },
@@ -120,7 +177,10 @@ const app = {
                            id="manual_${i}" 
                            maxlength="1" 
                            placeholder="A-E"
-                           oninput="app.validateAnswerInput(this)">
+                           inputmode="text"
+                           autocomplete="off"
+                           oninput="app.validateAnswerInput(this)"
+                           onkeydown="app.handleKeyNavigation(event, ${i}, 'manual')">
                 </div>
             `;
         }
@@ -136,17 +196,49 @@ const app = {
         const file = event.target.files[0];
         if (!file) return;
         
+        // Validasi file type
         if (!file.type.startsWith('image/')) {
             alert('Mohon upload file gambar (JPG, PNG, GIF, BMP, WEBP)');
             return;
         }
         
+        // Validasi file size (max 10MB)
+        if (file.size > 10 * 1024 * 1024) {
+            alert('Ukuran file terlalu besar. Maksimal 10MB.');
+            return;
+        }
+        
         const reader = new FileReader();
+        
+        reader.onprogress = (e) => {
+            if (e.lengthComputable) {
+                const percent = Math.round((e.loaded / e.total) * 100);
+                console.log('Loading image:', percent + '%');
+            }
+        };
+        
         reader.onload = (e) => {
             const img = document.getElementById('previewImage');
             img.src = e.target.result;
-            document.getElementById('previewContainer').classList.remove('hidden');
+            img.onload = () => {
+                document.getElementById('previewContainer').classList.remove('hidden');
+                
+                // Scroll ke preview di mobile
+                if (window.innerWidth < 768) {
+                    setTimeout(() => {
+                        document.getElementById('previewContainer').scrollIntoView({ 
+                            behavior: 'smooth', 
+                            block: 'nearest' 
+                        });
+                    }, 100);
+                }
+            };
         };
+        
+        reader.onerror = () => {
+            alert('Gagal membaca file. Coba file lain.');
+        };
+        
         reader.readAsDataURL(file);
     },
     
@@ -154,10 +246,19 @@ const app = {
      * Clear gambar yang diupload
      */
     clearImage() {
-        document.getElementById('fileInput').value = '';
-        document.getElementById('previewContainer').classList.add('hidden');
-        document.getElementById('ocrResult').classList.add('hidden');
-        document.getElementById('progressContainer').classList.add('hidden');
+        const fileInput = document.getElementById('fileInput');
+        const previewContainer = document.getElementById('previewContainer');
+        const ocrResult = document.getElementById('ocrResult');
+        const progressContainer = document.getElementById('progressContainer');
+        const previewImage = document.getElementById('previewImage');
+        
+        if (fileInput) fileInput.value = '';
+        if (previewContainer) previewContainer.classList.add('hidden');
+        if (ocrResult) ocrResult.classList.add('hidden');
+        if (progressContainer) progressContainer.classList.add('hidden');
+        if (previewImage) previewImage.src = '';
+        
+        this.extractedAnswersFromOCR = [];
     },
     
     /**
@@ -165,7 +266,14 @@ const app = {
      */
     useExtractedAnswers() {
         this.studentAnswers = [...this.extractedAnswersFromOCR];
-        const studentName = document.getElementById('studentNameUpload').value || 'Siswa';
+        const studentName = document.getElementById('studentNameUpload').value.trim() || 'Siswa';
+        
+        if (!studentName || studentName === 'Siswa') {
+            // Scroll ke nama input
+            document.getElementById('studentNameUpload').focus();
+            return;
+        }
+        
         this.checkAndShowResults(studentName);
     },
     
@@ -174,7 +282,9 @@ const app = {
      */
     editExtractedAnswers() {
         this.switchTab('manual');
-        document.getElementById('studentNameManual').value = document.getElementById('studentNameUpload').value;
+        
+        const uploadName = document.getElementById('studentNameUpload').value;
+        document.getElementById('studentNameManual').value = uploadName;
         
         // Fill manual inputs dengan hasil OCR
         this.extractedAnswersFromOCR.forEach((ans, idx) => {
@@ -183,6 +293,14 @@ const app = {
                 input.value = ans;
             }
         });
+        
+        // Scroll ke form
+        setTimeout(() => {
+            document.getElementById('manualInputsContainer').scrollIntoView({ 
+                behavior: 'smooth', 
+                block: 'start' 
+            });
+        }, 100);
     },
     
     /**
@@ -190,10 +308,11 @@ const app = {
      */
     checkManualAnswers() {
         this.studentAnswers = [];
-        const studentName = document.getElementById('studentNameManual').value || 'Siswa';
+        const studentName = document.getElementById('studentNameManual').value.trim() || 'Siswa';
         
         for (let i = 1; i <= this.totalQuestions; i++) {
-            const val = document.getElementById(`manual_${i}`).value.toUpperCase();
+            const input = document.getElementById(`manual_${i}`);
+            const val = input ? input.value.toUpperCase() : '';
             this.studentAnswers.push(val || '-');
         }
         
@@ -233,7 +352,8 @@ const app = {
             wrong,
             empty,
             score: score.toFixed(2),
-            details
+            details,
+            timestamp: new Date().toISOString()
         };
         
         this.displayResults(studentName, score, correct, wrong, empty, details);
@@ -253,7 +373,7 @@ const app = {
         // Detail grid
         const grid = document.getElementById('detailGrid');
         grid.innerHTML = details.map(d => `
-            <div class="answer-item ${d.status}">
+            <div class="answer-item ${d.status}" onclick="app.scrollToTableRow(${d.no})">
                 <div class="answer-number">No. ${d.no}</div>
                 <div class="answer-value">${d.answer !== '-' ? d.answer : '?'}</div>
                 <div class="answer-key">Kunci: ${d.key}</div>
@@ -271,11 +391,11 @@ const app = {
             const statusText = d.status === 'correct' ? 'Benar' : 
                               d.status === 'wrong' ? 'Salah' : 'Kosong';
             const keterangan = d.status === 'correct' ? 'Jawaban sesuai kunci' :
-                              d.status === 'wrong' ? `Jawaban seharusnya ${d.key}` :
+                              d.status === 'wrong' ? `Seharusnya ${d.key}` :
                               'Tidak dijawab';
             
             return `
-                <tr>
+                <tr id="row-${d.no}">
                     <td><strong>${d.no}</strong></td>
                     <td><strong>${d.key}</strong></td>
                     <td>${d.answer !== '-' ? d.answer : '<em style="color: #999;">-</em>'}</td>
@@ -286,8 +406,29 @@ const app = {
         }).join('');
         
         // Show result section
-        document.getElementById('resultSection').classList.remove('hidden');
-        document.getElementById('resultSection').scrollIntoView({ behavior: 'smooth' });
+        const resultSection = document.getElementById('resultSection');
+        resultSection.classList.remove('hidden');
+        
+        // Scroll dengan offset untuk mobile
+        setTimeout(() => {
+            const offset = window.innerWidth < 768 ? 60 : 80;
+            const top = resultSection.getBoundingClientRect().top + window.pageYOffset - offset;
+            window.scrollTo({ top, behavior: 'smooth' });
+        }, 100);
+    },
+    
+    /**
+     * Scroll ke row tertentu di tabel
+     */
+    scrollToTableRow(rowNum) {
+        const row = document.getElementById(`row-${rowNum}`);
+        if (row) {
+            row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            row.style.background = '#e0e7ff';
+            setTimeout(() => {
+                row.style.background = '';
+            }, 2000);
+        }
     },
     
     /**
@@ -295,8 +436,10 @@ const app = {
      */
     resetForNewStudent() {
         // Clear inputs
-        document.getElementById('studentNameUpload').value = '';
-        document.getElementById('studentNameManual').value = '';
+        const nameUpload = document.getElementById('studentNameUpload');
+        const nameManual = document.getElementById('studentNameManual');
+        if (nameUpload) nameUpload.value = '';
+        if (nameManual) nameManual.value = '';
         
         // Clear image
         this.clearImage();
@@ -310,17 +453,33 @@ const app = {
         // Hide result
         document.getElementById('resultSection').classList.add('hidden');
         
-        // Scroll to student section
-        document.getElementById('studentSection').scrollIntoView({ behavior: 'smooth' });
+        // Reset tabs ke upload
+        this.switchTab('upload');
+        
+        // Scroll ke student section
+        setTimeout(() => {
+            const offset = window.innerWidth < 768 ? 60 : 80;
+            const section = document.getElementById('studentSection');
+            const top = section.getBoundingClientRect().top + window.pageYOffset - offset;
+            window.scrollTo({ top, behavior: 'smooth' });
+        }, 100);
     },
     
     /**
      * Export hasil ke CSV
      */
     exportResults() {
-        if (!this.currentResult) return;
+        if (!this.currentResult) {
+            alert('Tidak ada hasil untuk diexport');
+            return;
+        }
         
-        let csv = 'No,Kunci Jawaban,Jawaban Siswa,Status,Keterangan\n';
+        let csv = '\uFEFF'; // BOM for Excel UTF-8
+        
+        // Header
+        csv += 'No,Kunci Jawaban,Jawaban Siswa,Status,Keterangan\n';
+        
+        // Data
         this.currentResult.details.forEach(d => {
             const status = d.status === 'correct' ? 'Benar' : d.status === 'wrong' ? 'Salah' : 'Kosong';
             const keterangan = d.status === 'correct' ? 'Jawaban sesuai kunci' :
@@ -329,21 +488,32 @@ const app = {
             csv += `${d.no},${d.key},${d.answer},${status},${keterangan}\n`;
         });
         
+        // Summary
         csv += `\nNama Siswa,${this.currentResult.name}\n`;
         csv += `Benar,${this.currentResult.correct}\n`;
         csv += `Salah,${this.currentResult.wrong}\n`;
         csv += `Kosong,${this.currentResult.empty}\n`;
         csv += `Nilai,${this.currentResult.score}\n`;
+        csv += `Tanggal,${new Date().toLocaleString('id-ID')}\n`;
         
         // Download
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
+        
         const timestamp = new Date().toISOString().split('T')[0];
-        link.download = `hasil_ujian_${this.currentResult.name.replace(/\s+/g, '_')}_${timestamp}.csv`;
+        const safeName = this.currentResult.name.replace(/[^a-z0-9]/gi, '_').substring(0, 30);
+        link.download = `ExamScan_${safeName}_${timestamp}.csv`;
+        
+        // Trigger download
+        document.body.appendChild(link);
         link.click();
+        document.body.removeChild(link);
         URL.revokeObjectURL(url);
+        
+        // Feedback
+        if (navigator.vibrate) navigator.vibrate([50, 100, 50]);
     },
     
     /**
@@ -355,22 +525,40 @@ const app = {
         document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
         
         if (tab === 'upload') {
-            document.querySelectorAll('.tab')[0].classList.add('active');
-            document.getElementById('uploadTab').classList.add('active');
+            document.querySelectorAll('.tab')[0]?.classList.add('active');
+            document.getElementById('uploadTab')?.classList.add('active');
         } else {
-            document.querySelectorAll('.tab')[1].classList.add('active');
-            document.getElementById('manualTab').classList.add('active');
+            document.querySelectorAll('.tab')[1]?.classList.add('active');
+            document.getElementById('manualTab')?.classList.add('active');
         }
     }
 };
 
-// Expose to global untuk akses dari HTML
+// Expose to global
 window.app = app;
 
-// Event listener untuk file input
+// Event listeners saat DOM ready
 document.addEventListener('DOMContentLoaded', () => {
+    // File input handler
     const fileInput = document.getElementById('fileInput');
     if (fileInput) {
         fileInput.addEventListener('change', (e) => app.handleFileSelect(e));
     }
+    
+    // Handle visibility change untuk pause/resume OCR
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden && window.ocrHandler) {
+            // Pause processing if needed
+            console.log('Tab hidden, OCR processing paused');
+        }
+    });
+    
+    // Handle online/offline
+    window.addEventListener('online', () => {
+        console.log('Connection restored');
+    });
+    
+    window.addEventListener('offline', () => {
+        alert('Koneksi internet terputus. Beberapa fitur mungkin tidak berfungsi.');
+    });
 });
