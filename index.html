@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="id" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
-    <meta name="theme-color" content="#4f46e5">
+    <meta name="theme-color" content="#6366f1">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
     
@@ -27,14 +27,22 @@
                     <span class="logo-tagline">Pemeriksa Jawaban Otomatis</span>
                 </div>
             </div>
-            <nav class="main-nav">
-                <button class="nav-btn active" onclick="app.showPage('grading')" data-page="grading">
-                    <span>✓</span> Periksa
+            <div class="header-actions">
+                <!-- Toggle Mode Button -->
+                <button type="button" class="theme-toggle" id="themeToggle" onclick="toggleTheme()" aria-label="Ganti mode tema">
+                    <span class="theme-icon sun">☀️</span>
+                    <span class="theme-icon moon">🌙</span>
+                    <span class="theme-label">Mode</span>
                 </button>
-                <button class="nav-btn" onclick="app.showPage('history')" data-page="history">
-                    <span>📚</span> Riwayat
-                </button>
-            </nav>
+                <nav class="main-nav">
+                    <button class="nav-btn active" onclick="app.showPage('grading')" data-page="grading">
+                        <span>✓</span> Periksa
+                    </button>
+                    <button class="nav-btn" onclick="app.showPage('history')" data-page="history">
+                        <span>📚</span> Riwayat
+                    </button>
+                </nav>
+            </div>
         </header>
 
         <!-- PAGE: GRADING -->
@@ -374,6 +382,34 @@
             </div>
         </div>
     </div>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        // Check saved theme or system preference
+        (function() {
+            const savedTheme = localStorage.getItem('autograder-theme');
+            const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            
+            if (savedTheme === 'dark' || (!savedTheme && systemDark)) {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            }
+        })();
+        
+        function toggleTheme() {
+            const html = document.documentElement;
+            const current = html.getAttribute('data-theme');
+            const next = current === 'dark' ? 'light' : 'dark';
+            
+            html.setAttribute('data-theme', next);
+            localStorage.setItem('autograder-theme', next);
+            
+            // Update meta theme-color
+            const metaTheme = document.querySelector('meta[name="theme-color"]');
+            if (metaTheme) {
+                metaTheme.setAttribute('content', next === 'dark' ? '#1e1b4b' : '#6366f1');
+            }
+        }
+    </script>
 
     <!-- Scripts -->
     <script src="js/history-manager.js"></script>
